@@ -1,7 +1,7 @@
 
 # coding: utf-8
 
-# In[139]:
+# In[1]:
 
 #imports
 import cv2
@@ -29,7 +29,7 @@ if 'oldsysstdout' not in locals():
     sys.stdout = flushfile(sys.stdout)
 
 
-# In[ ]:
+# In[39]:
 
 visualize = False
 def detect(img):
@@ -77,24 +77,6 @@ def subimage2(image, c1, c2, width):
     tc = h/c
     #print (topoint(c1), topoint(c2), center, ts, tc, w, h, c)
     return subimage(image, center, ts, tc, width, c)
-
-def mergeCoords(coords,maxDist2=100):
-    clusters = []
-    for c in coords:
-        matched = 0
-        for cluster in clusters:
-            ok = 1
-            for n in cluster:
-                if dist2(c, n)>maxDist2:
-                    ok =0
-                    break
-            if ok == 1:
-                cluster += [c]
-                matched = 1
-                break
-        if matched == 0:
-            clusters += [[c]]
-    return clusters
 
 def circleCoords(coords, mask_zero, radius = 2, maxSize = 22):
     mask = mask_zero[:,:,0].copy()
@@ -145,9 +127,20 @@ def findGraph(candidates, img):
                 graph[j] += [i]
     return graph, mask
 
-def findHouse(graph, mask_, img, primary=5, secondary=4, name='_X', color=(0,0,255)):
+#http://stackoverflow.com/a/246063
+def CrossProductZ(a,b):
+    return a[0] * b[1] - a[1] * b[0]
+
+def Orientation(a, b, c):
+    return CrossProductZ(a, b) + CrossProductZ(b, c) + CrossProductZ(c, a)
+
+def OrientationC(g, a, b, c):
+    return Orientation(g[a],g[b],g[c])
+
+def findHouse(graph, mask_, img, candidates, primary=5, secondary=4, name='_X', color=(0,0,255)):
     if visualize:
         mask = mask_.copy()
+    houses = []
     for i in graph:
         if len(graph[i]) != 2:
             continue
@@ -162,15 +155,71 @@ def findHouse(graph, mask_, img, primary=5, secondary=4, name='_X', color=(0,0,2
         if ok == 0:
             continue
         print [a]+graph[a]
+        if OrientationC(candidates,i,a,b)<0:
+            (a,b) = (b,a)
         for x in [a]+graph[a]:
             for y in graph[x]:
                 if x<y:
                     if visualize:
                         cv2.line(mask, topoint(candidates[x]), topoint(candidates[y]),255,3)
                     cv2.line(img, topoint(candidates[x]), topoint(candidates[y]),color,1)
+        used = {i: 1, a:1, b:1}
+        print used
+        x = 0
+        s = 0
+        if name == '_X':
+            for j in filter(lambda x: x not in used, graph[a]):
+                s_ = 0
+                for k in graph[j]:
+                    s_ += dist2(candidates[j],candidates[k])
+                if x == 0 or s_ < s:
+                    x = j
+                    s = s_
+        else:
+            return
+        used[x] = 1
+        [c,d] = filter(lambda x: x not in used, graph[a])
+        if OrientationC(candidates,x,c,d)<0:
+            (c,d) = (d,c)
+        cv2.circle(img, topoint(candidates[i]), 5, (255,0,0),-1)
+        cv2.circle(img, topoint(candidates[a]), 5, (0,0,255),-1)#tr
+        cv2.circle(img, topoint(candidates[b]), 5, (0,255,0),-1)#tl
+        cv2.circle(img, topoint(candidates[x]), 5, (255,255,255),-1)
+        cv2.circle(img, topoint(candidates[c]), 5, (0,255,255),-1)#br
+        cv2.circle(img, topoint(candidates[d]), 5, (255,0,255),-1)#bl
+    
+        points_img = [candidates[a],candidates[b],candidates[c],candidates[d]]
+        points_new = [[99,0],[0,0],[99,99],[0,99]]
+        p_img = np.array(points_img, np.float32)
+        p_new = np.array(points_new, np.float32)
+        persp = cv2.getPerspectiveTransform(p_img, p_new)
+        trans = cv2.warpPerspective(img, persp, (100, 100))
+        cv2.imshow('trans',trans)
         
-    if visualize:          
-        cv2.imshow('mask'+name, mask)
+        if OrientationC(candidates,i,a,b)<0:
+            (a,b) = (b,a)
+        houses += [(i,x,a,c,d,b)]
+
+        tr_tl = np.cross(np.append(candidates[a],[1]),np.append(candidates[b],[1]))
+        tr_br = np.cross(np.append(candidates[a],[1]),np.append(candidates[c],[1]))
+        (x1,y1) = (tr_tl[0]/tr_tl[2], tr_tl[1]/tr_tl[2])
+        #d1 = math.sqrt(dist2((0,0),(x1,y1))) / 10.0
+        #x1 /= d1
+        #y1 /= d1
+        (x2,y2) = (tr_br[0]/tr_br[2], tr_br[1]/tr_br[2])
+        #d2 = math.sqrt(dist2((0,0),(x2,y2))) / 10.0
+        #x2 /= d2
+        #y2 /= d2
+        
+        print (x1,y1)
+        print (x2,y2)
+        
+        normal =  tr_tl * tr_br
+        #top = candidates[x] + normal[0:1]*
+        print normal 
+        
+        if visualize:          
+            cv2.imshow('mask'+name, mask)
     return
 
 mypath = 'frames'
@@ -188,8 +237,8 @@ for f in listdir(mypath):
     coords_ = detect(frame)
     candidates = circleCoords(coords_, np.zeros_like(frame))
     graph, mask = findGraph(candidates, frame)
-    findHouse(graph, mask, frame, 5, 4, '_X')
-    findHouse(graph, mask, frame,3, 2, '_N', color=(0,255,0))
+    findHouse(graph, mask, frame, candidates, 5, 4, '_X')
+    findHouse(graph, mask, frame, candidates, 3, 2, '_N', color=(0,255,0))
     end = time.time()
     cv2.imshow('dst',frame)
     print end - start
@@ -198,6 +247,11 @@ for f in listdir(mypath):
     #break
 cap.release()
 #coords_
+
+
+# In[13]:
+
+cv2.__version__
 
 
 # In[18]:
