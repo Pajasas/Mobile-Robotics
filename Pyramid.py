@@ -8,10 +8,12 @@ import cv2
 import numpy as np
 from os import listdir
 from os.path import isfile, join
+import glob
+import os
 import time
 import math
 from collections import defaultdict
-
+from numpy.linalg import inv
 
 if 'oldsysstdout' not in locals():
     import sys
@@ -29,13 +31,28 @@ if 'oldsysstdout' not in locals():
     sys.stdout = flushfile(sys.stdout)
 
 
-# In[39]:
+# In[2]:
 
-visualize = False
+criteria = (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, 30, 0.001)
+
+def nothing(x):
+    pass
+
+
+# In[ ]:
+
+cv2.destroyAllWindows()
+
+
+# In[3]:
+
+visualize = True
 def detect(img):
-    gray = cv2.cvtColor(img,cv2.COLOR_BGR2GRAY)
-    gray = np.float32(gray)
-    dst = cv2.cornerHarris(gray,2,3,0.04)
+    img_gs = cv2.cvtColor(img,cv2.COLOR_BGR2GRAY)
+    clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8,8))
+    img_gs = clahe.apply(img_gs)
+    img_gs_f = np.float32(img_gs)
+    dst = cv2.cornerHarris(img_gs_f,2,3,0.04)
     #result is dilated for marking the corners, not important
     dst = cv2.dilate(dst,None)
     
@@ -44,14 +61,12 @@ def detect(img):
     #if visualize:
         #img[dst>0.01*dst.max()]=[0,0,255]
     #print coords
-    #cv2.imshow('dst',img)
-    return coords
+    return (coords,img_gs_f, img_gs)
 
 def dist2(a, b):
     return (a[0]-b[0])*(a[0]-b[0]) + (a[1]-b[1])*(a[1]-b[1])
 
 def subimage(image, center, ts, tc, width, height):
-    
     v_x = (tc, ts)
     v_y = (-ts,tc)
     s_x = center[0] - v_x[0] * (width / 2) - v_y[0] * (height / 2)
@@ -68,6 +83,7 @@ def subimage(image, center, ts, tc, width, height):
         flags=cv2.WARP_INVERSE_MAP,
         borderMode=cv2.BORDER_REPLICATE)
 
+#get image of a line between two points with given width
 def subimage2(image, c1, c2, width):
     w = c1[0]-c2[0]
     h = c1[1]-c2[1]
@@ -104,11 +120,7 @@ def topoint(x):
     return (int(x[0]),int(x[1]))
     
 
-def findGraph(candidates, img):
-    img_gs = cv2.cvtColor(img,cv2.COLOR_BGR2GRAY)
-    
-    clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8,8))
-    img_gs = clahe.apply(img_gs)
+def findGraph(candidates, img_gs, max_mean=40):
     mask = np.zeros_like(img_gs)
     graph = defaultdict(lambda:[])
     if visualize:
@@ -120,11 +132,13 @@ def findGraph(candidates, img):
             min_ = np.amin(sub, axis = 1)
             
             
-            if min_.mean() < 40:
+            if min_.mean() < max_mean:
                 if visualize:
                     cv2.line(mask, topoint(c), topoint(candidates[j]),255,1)
                 graph[i] += [j]
                 graph[j] += [i]
+    if visualize:
+        cv2.imshow('graph', mask)
     return graph, mask
 
 #http://stackoverflow.com/a/246063
@@ -137,11 +151,13 @@ def Orientation(a, b, c):
 def OrientationC(g, a, b, c):
     return Orientation(g[a],g[b],g[c])
 
-def findHouse(graph, mask_, img, candidates, primary=5, secondary=4, name='_X', color=(0,0,255)):
+def add1(a):
+    return np.append(a,[1])
+
+def findHouse(graph, mask_, img, candidates, primary=5, secondary=4, name='_X', color=(0,0,255),img_gs=None):
     if visualize:
         mask = mask_.copy()
-    houses = []
-    for i in graph:
+    for i in graph: #subgraph localization
         if len(graph[i]) != 2:
             continue
         [a,b] = graph[i]
@@ -154,7 +170,6 @@ def findHouse(graph, mask_, img, candidates, primary=5, secondary=4, name='_X', 
                 break
         if ok == 0:
             continue
-        print [a]+graph[a]
         if OrientationC(candidates,i,a,b)<0:
             (a,b) = (b,a)
         for x in [a]+graph[a]:
@@ -164,10 +179,10 @@ def findHouse(graph, mask_, img, candidates, primary=5, secondary=4, name='_X', 
                         cv2.line(mask, topoint(candidates[x]), topoint(candidates[y]),255,3)
                     cv2.line(img, topoint(candidates[x]), topoint(candidates[y]),color,1)
         used = {i: 1, a:1, b:1}
-        print used
+        
         x = 0
         s = 0
-        if name == '_X':
+        if name == '_X':#find middle point
             for j in filter(lambda x: x not in used, graph[a]):
                 s_ = 0
                 for k in graph[j]:
@@ -175,93 +190,110 @@ def findHouse(graph, mask_, img, candidates, primary=5, secondary=4, name='_X', 
                 if x == 0 or s_ < s:
                     x = j
                     s = s_
-        else:
-            return
-        used[x] = 1
-        [c,d] = filter(lambda x: x not in used, graph[a])
+            used[x] = 1
+        cd = filter(lambda x: x not in used, graph[a])
+        if len(cd) != 2:
+            #print "cd has len %d" %len(cd)
+            return (None, None)
+        [c,d] = cd
         if OrientationC(candidates,x,c,d)<0:
             (c,d) = (d,c)
-        cv2.circle(img, topoint(candidates[i]), 5, (255,0,0),-1)
-        cv2.circle(img, topoint(candidates[a]), 5, (0,0,255),-1)#tr
-        cv2.circle(img, topoint(candidates[b]), 5, (0,255,0),-1)#tl
-        cv2.circle(img, topoint(candidates[x]), 5, (255,255,255),-1)
-        cv2.circle(img, topoint(candidates[c]), 5, (0,255,255),-1)#br
-        cv2.circle(img, topoint(candidates[d]), 5, (255,0,255),-1)#bl
     
-        points_img = [candidates[a],candidates[b],candidates[c],candidates[d]]
-        points_new = [[99,0],[0,0],[99,99],[0,99]]
+        points_imdg = [candidates[__] for __ in [a,b,c,d]]#,x,i
+        if name == '_X':
+            points_img = [candidates[__] for __ in [a,b,c,d,x]]#,x,i
+            new_3d = np.float32([[100,0,0],[0,0,0],[100,100,0],[0,100,0],[50,50,0]])
+        else:
+            points_img = [candidates[__] for __ in [a,b,c,d]]#,x,i
+            new_3d = np.float32([[100,0,0],[0,0,0],[100,100,0],[0,100,0]])
         p_img = np.array(points_img, np.float32)
-        p_new = np.array(points_new, np.float32)
-        persp = cv2.getPerspectiveTransform(p_img, p_new)
-        trans = cv2.warpPerspective(img, persp, (100, 100))
-        cv2.imshow('trans',trans)
-        
-        if OrientationC(candidates,i,a,b)<0:
-            (a,b) = (b,a)
-        houses += [(i,x,a,c,d,b)]
+        cv2.cornerSubPix(img_gs,p_img,(11,11),(-1,-1),criteria)
+        #cv2.circle(img, topoint(p_img[5]), 5, (255,0,0),-1)
+        cv2.circle(img, topoint(p_img[0]), 5, (0,0,255),-1)#tr
+        cv2.circle(img, topoint(p_img[1]), 5, (0,255,0),-1)#tl
+        #cv2.circle(img, topoint(p_img[4]), 5, (255,255,255),-1)
+        cv2.circle(img, topoint(p_img[2]), 5, (0,255,255),-1)#br
+        cv2.circle(img, topoint(p_img[3]), 5, (255,0,255),-1)#bl
+        return draw3d(img,p_img,new_3d)
+    #   
+    return (None,None)
 
-        tr_tl = np.cross(np.append(candidates[a],[1]),np.append(candidates[b],[1]))
-        tr_br = np.cross(np.append(candidates[a],[1]),np.append(candidates[c],[1]))
-        (x1,y1) = (tr_tl[0]/tr_tl[2], tr_tl[1]/tr_tl[2])
-        #d1 = math.sqrt(dist2((0,0),(x1,y1))) / 10.0
-        #x1 /= d1
-        #y1 /= d1
-        (x2,y2) = (tr_br[0]/tr_br[2], tr_br[1]/tr_br[2])
-        #d2 = math.sqrt(dist2((0,0),(x2,y2))) / 10.0
-        #x2 /= d2
-        #y2 /= d2
-        
-        print (x1,y1)
-        print (x2,y2)
-        
-        normal =  tr_tl * tr_br
-        #top = candidates[x] + normal[0:1]*
-        print normal 
-        
-        if visualize:          
-            cv2.imshow('mask'+name, mask)
-    return
+goal_3d = np.float32([[50,50,-1]])
+def draw3d(img, pts, new_3d):
+    fx = 0.5 + cv2.getTrackbarPos('focal', 'dst') / 50.0
+    h, w = img.shape[:2]
+    K = np.float64([[fx*w, 0, 0.5*(w-1)],
+                    [0, fx*w, 0.5*(h-1)],
+                    [0.0,0.0,      1.0]])
+    dist_coef = np.zeros(4)
+    ret, rvec, tvec = cv2.solvePnP(new_3d, pts, K, dist_coef)
+    goal_3d[0,2] = -1 * cv2.getTrackbarPos('height', 'dst')
+    verts = cv2.projectPoints(goal_3d, rvec, tvec, K, dist_coef)[0].reshape(-1, 2)
+    cv2.circle(img, topoint(verts[0]), 5, (255,255,255),-1)
+    for p in pts:
+        cv2.line(img, topoint(p), topoint(verts[0]), (255,255,255),2, -1)
 
-mypath = 'frames'
+def detectHouse(frame, house_type='_X'):
+    (coords_,img_gs_f, img_gs) = detect(frame)
+    candidates = circleCoords(coords_, np.zeros_like(frame))
+    graph, mask = findGraph(candidates, img_gs,max_mean=cv2.getTrackbarPos('max_mean', 'dst'))
+    findHouse(graph, mask, frame, candidates, 5, 4, '_X', img_gs=img_gs)
+    #findHouse(graph, mask, frame, candidates, 3, 2, '_N', img_gs=img_gs)
+    cv2.imshow('dst',frame)
+
+
+# In[ ]:
+
+#camera example
+cv2.namedWindow('dst')
+cv2.createTrackbar('focal', 'dst', 25, 50, nothing)
+cv2.createTrackbar('height', 'dst', 50, 200, nothing)
+cv2.createTrackbar('max_mean', 'dst', 40, 200, nothing)
+
 if 'cap' in locals():
     cap.release()
-#cap = cv2.VideoCapture(0)
-#while(True):
-for f in listdir(mypath):
-    if not isfile(join(mypath, f)):
-        continue
-    
-    #ret, frame = cap.read()
-    frame = cv2.imread(join(mypath, f))
-    start = time.time()
-    coords_ = detect(frame)
-    candidates = circleCoords(coords_, np.zeros_like(frame))
-    graph, mask = findGraph(candidates, frame)
-    findHouse(graph, mask, frame, candidates, 5, 4, '_X')
-    findHouse(graph, mask, frame, candidates, 3, 2, '_N', color=(0,255,0))
-    end = time.time()
-    cv2.imshow('dst',frame)
-    print end - start
-    if cv2.waitKey(0) & 0xFF == ord('q'):
+cap = cv2.VideoCapture(1)#select correct camera\
+
+while(True):
+    ret, frame = cap.read()
+    detectHouse(frame)
+    key = cv2.waitKey(1)
+    if key & 0xFF == ord('q'):
         break
-    #break
-cap.release()
-#coords_
+if 'cap' in locals():
+    cap.release()
 
 
-# In[13]:
+# In[4]:
+
+#scanned pictures example
+mypath = 'frames'
+cv2.namedWindow('dst')
+cv2.createTrackbar('focal', 'dst', 25, 50, nothing)
+cv2.createTrackbar('height', 'dst', 50, 200, nothing)
+cv2.createTrackbar('max_mean', 'dst', 40, 200, nothing)
+
+for f in glob.glob(os.path.join(mypath,'*.jpg')):
+    frame_orig = cv2.imread(f)
+    while True:
+        frame = frame_orig.copy()
+        detectHouse(frame)
+        key = cv2.waitKey(100)
+        if key & 0xFF == ord('q') or key & 0xFF == ord(' '):
+            break
+    if key & 0xFF == ord('q'):
+        break
+#for f in listdir(mypath)
+
+
+# In[5]:
 
 cv2.__version__
 
 
-# In[18]:
+# In[ ]:
 
-len(clusters)
-
-
-# In[23]:
-
-
+#store frames
 
 if 'cap' in locals():
     cap.release()
