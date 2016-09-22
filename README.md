@@ -27,7 +27,7 @@ My algorithm is looking for 6 key points marked in the following image.
 
 ![House key points](house_points.png?raw=true "House key points")
 
-Here I've used corner detection cv2.cornerHarris to detect corners in the grayscale image.
+Here I've used corner detection cv2.cornerHarris to detect corners in the gray-scale image.
 From the structure of the house there should be about 3-5 corners next to each other for each point.
 We can therefore discard both too small and too large groups of nearby corners.
 This steps creates a set of candidates for house key points.
@@ -66,7 +66,7 @@ There are also two examples as python files:
 - example_frames.py - run house detection on a set of frames used for testing.
 
 Following windows show up after starting:
-- clahe - grayscaled version of the current frame
+- clahe - gray-scaled version of the current frame
 - markers_col - detected corners with marked key point candidates
 - graph - constructed graph
 - dst - main window with a house draw (if detected)
@@ -74,7 +74,7 @@ Following windows show up after starting:
 Main window also provides following sliders:
 - focal - focal distance
 - height - height of the top of the pyramid
-- max_mean - how dar the lines need to be to be considered as edges in the graph creation
+- max_mean - how dark the lines need to be to be considered as edges in the graph creation
 
 ## Camera example controls
 - q - stop example
