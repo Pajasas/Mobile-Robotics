@@ -40,17 +40,20 @@ Edge is added between each two candidates that are connected with dark enough li
 !["Graph"](graph.png?raw=true "Graph")
 
 Final step here is to find a subgraph corresponding to a house.
+
+?Describe the subgraph search in detail?
+
 If there is a subgraph equal to a house graph the subgraph points a passed to be drawn in 3d.
 
 # 3d drawing
 
+We often do not have calibration data for the used camera, so this algorithm uses variable focal distance set by a slider.
+Calibration data could be used too to increase accuracy.
 
-We do not have calibration data for used camera.
-Set focal distance by slider.
+Because we know relative distances between the house key points we can use cv2.solvePnP to create a projection from 3d world space to our 2d plane.
+Then we use this projection to get 2d coordinates for the middle point of the pyramid in specified height.
 
-We know relative distances between the house key points.
-
-!["Final pyramid placed"](3d.png?raw=true "Final pyramid placed")
+!["Final point of a pyramid placed"](3d.png?raw=true "Final point of a pyramid placed")
 
 Opencv2 example: https://github.com/opencv/opencv/blob/master/samples/python/plane_ar.py .
 
