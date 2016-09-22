@@ -20,7 +20,7 @@ My algorithm for house detection works in following steps:
 I've used standard conversion to from BGR to gray-scale and applied CLAHE (Contrast Limited Adaptive Histogram Equalization) to equalize contrast.
 Opencv tutorial describing this technique can be found ![here](docs.opencv.org/3.1.0/d5/daf/tutorial_py_histogram_equalization.html).
 
---todo picture of gray-scaled image
+!["Gray-scaled image"](clahe.png?raw=true "Gray-scaled image")
 
 Next step is to find key points of a house. 
 My algorithm is looking for 6 key points marked in the following image.
@@ -37,17 +37,20 @@ This steps creates a set of candidates for house key points.
 Next task is to construct a graph where vertexes are candidates from previous steps.
 Edge is added between each two candidates that are connected with dark enough line.
 
+!["Graph"](graph.png?raw=true "Graph")
+
 Final step here is to find a subgraph corresponding to a house.
 If there is a subgraph equal to a house graph the subgraph points a passed to be drawn in 3d.
 
 # 3d drawing
 
---TODO
 
 We do not have calibration data for used camera.
 Set focal distance by slider.
 
 We know relative distances between the house key points.
+
+!["Final pyramid placed"](3d.png?raw=true "Final pyramid placed")
 
 Opencv2 example: https://github.com/opencv/opencv/blob/master/samples/python/plane_ar.py .
 
