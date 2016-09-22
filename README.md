@@ -17,10 +17,10 @@ My algorithm for house detection works in following steps:
 
 ## House points detection
 
-I've used standard conversion to from BGR to grayscale and applied CLAHE (Contrast Limited Adaptive Histogram Equalization) to equalize contrast.
+I've used standard conversion to from BGR to gray-scale and applied CLAHE (Contrast Limited Adaptive Histogram Equalization) to equalize contrast.
 Opencv tutorial describing this technique can be found ![here](docs.opencv.org/3.1.0/d5/daf/tutorial_py_histogram_equalization.html).
 
---todo picture of grayscaled image
+--todo picture of gray-scaled image
 
 Next step is to find key points of a house. 
 My algorithm is looking for 6 key points marked in the following image.
@@ -30,32 +30,49 @@ My algorithm is looking for 6 key points marked in the following image.
 Here I've used corner detection cv2.cornerHarris to detect corners in the grayscale image.
 From the structure of the house there should be about 3-5 corners next to each other for each point.
 We can therefore discard both too small and too large groups of nearby corners.
+This steps creates a set of candidates for house key points.
 
---todo picture of corners image
+![corners](corners.png?raw=true "Corners, key points are marked in red circle")
 
-Next 
+Next task is to construct a graph where vertexes are candidates from previous steps.
+Edge is added between each two candidates that are connected with dark enough line.
 
---construct graph where vertices correspond to candidates and edges are between candidates connected with dark line (fuzzy)
-
---find subgraph corresponding to a house
+Final step here is to find a subgraph corresponding to a house.
+If there is a subgraph equal to a house graph the subgraph points a passed to be drawn in 3d.
 
 # 3d drawing
 
+--TODO
+
 We do not have calibration data for used camera.
 Set focal distance by slider.
+
+We know relative distances between the house key points.
 
 Opencv2 example: https://github.com/opencv/opencv/blob/master/samples/python/plane_ar.py .
 
 # Demos
 
-Common controls
-- sliders
-- windows
+Code is provided as a jupyter notebook for python 2.7 in file Pyramid.ipynb .
 
-## Camera example
+There are also two examples as python files:
+- example_camera.py - run house detection on camera feed.
+- example_frames.py - run house detection on a set of frames used for testing.
 
-Controls
+Following windows show up after starting:
+- clahe - grayscaled version of the current frame
+- markers_col - detected corners with marked key point candidates
+- graph - constructed graph
+- dst - main window with a house draw (if detected)
 
-## Stored frames example
+Main window also provides following sliders:
+- focal - focal distance
+- height - height of the top of the pyramid
+- max_mean - how dar the lines need to be to be considered as edges in the graph creation
 
-Controls
+## Camera example controls
+- q - stop example
+
+## Stored frames example controls
+- q - stop example
+- space - next frame
