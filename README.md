@@ -57,16 +57,28 @@ Edge is added between each two candidates that are connected with dark enough li
 !["Graph"](graph.png?raw=true "Graph")
 
 Final step here is to find a subgraph corresponding to a house.
+Let's take a look again at how the house should look and what graph it should have.
 
-?Describe the subgraph search in detail?
+![House key points](house_points.png?raw=true "House key points")
 
-If there is a subgraph equal to a house graph the subgraph points are passed to be drawn in 3d. -- prepsat
+The top node (orange) has a degree of 2 and is connected to 2 other nodes (red).
+Those are then both connected to each other and to 3 other nodes (blue and green) so they have a degree of 5.
+Green and both blue nodes are also connected to each other.
+
+I've used following steps to check for this type of subgraph.
+Following logic is done for each node n in the graph:
+- if n does not have a degree of 2 => n is not a top of a house
+- a, b = neigbours of n 
+- if a and b don't have a degree of 5 => n is not a top of a house
+- check orientation of the top triangle (a,b,n) and swap a and b if needed
+- x = neighbour of a that has shortes sum of edges #this will be the green point if this is a house subgraph
+- c,d = neighbours of a,b that are not a,b,n or x. if there are more than 2 neighbours => n is not top of a house
+- check orientation of the bottom triangle (x,c,d) and swap c and d if needed
+- house subgraph found, draw top point in 3d for house with key points (n,a,b,x,c,d)
 
 # 3d drawing
 
---zni divne
-
-We often do not have calibration data for the used camera, so this algorithm uses variable focal distance set by a slider.
+I didn't have calibration data for the used camera, so I've used variable focal distance set by a slider.
 Calibration data could be used as well to increase accuracy.
 
 Because we know relative distances between key points of the house we can use cv2.solvePnP to create a projection from 3d world space to our 2d plane.
