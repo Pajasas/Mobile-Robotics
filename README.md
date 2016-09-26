@@ -36,11 +36,11 @@ One way would be to group corners by distance between each other.
 However this was too slow to be ran on a live feed when implemented in Python.
 
 Next way is to use a temporary B/W image and draw small white circles for each corner.
-Then OpenCV2 function cv2.connectedComponentsWithStats can be used to locate continuous regions in this image and their properties like size and centrepoint.
+Then OpenCV2 function cv2.connectedComponentsWithStats can be used to locate continuous regions in this image and their properties like size and center point.
 Benefit here is that the heavy calculation is done inside the library and not in interpreted Python.
 
-The candidates for key points are the centrepoints of connected components with appropriate size.
-Exact size boundaries and white circles radius depend on the image resolution and "house" proportions (line width, conrner size).
+The candidates for key points are the center points of connected components with appropriate size.
+Exact size boundaries and white circles radius depend on the image resolution and "house" proportions (line width, corner size).
 
 In the following picture are circles around each detected corner with same color per each connected component.
 Red circle marks components that are key point candidates.
@@ -68,13 +68,14 @@ Green and both blue nodes are also connected to each other.
 I've used following steps to check for this type of subgraph.
 Following logic is done for each node n in the graph:
 - if n does not have a degree of 2 => n is not a top of a house
-- a, b = neigbours of n 
+- a, b = neighbors of n 
 - if a and b don't have a degree of 5 => n is not a top of a house
 - check orientation of the top triangle (a,b,n) and swap a and b if needed
-- x = neighbour of a that has shortes sum of edges #this will be the green point if this is a house subgraph
-- c,d = neighbours of a,b that are not a,b,n or x. if there are more than 2 neighbours => n is not top of a house
+- x = neighbor of a that has smallest sum of edges length #this will be the green point if this is a house subgraph
+- c,d = neighbors of a,b that are not a,b,n or x. if there are more than 2 neighbors  => n is not top of a house
 - check orientation of the bottom triangle (x,c,d) and swap c and d if needed
-- house subgraph found, draw top point in 3d for house with key points (n,a,b,x,c,d)
+- house subgraph found, get more precise key point coordinates using cv2.cornerSubPix
+- draw top point in 3d for house with key points (n,a,b,x,c,d)
 
 # 3d drawing
 
@@ -86,13 +87,14 @@ Then I've used this projection to get 2d coordinates for the middle point of the
 
 !["Final point of a pyramid placed"](3d.png?raw=true "Final point of a pyramid placed")
 
-Opencv2 example: https://github.com/opencv/opencv/blob/master/samples/python/plane_ar.py .
+Opencv2 example that shows usage of cv2.solvePnP : https://github.com/opencv/opencv/blob/master/samples/python/plane_ar.py .
 
 # Possible improvements
 
 This work can be improved in following ways:
 - In this case there is always a white area around the house (the paper it was printed on), so this could help to elimiate misleading corners.
 - The relative distances of key points are also so a test whether the subgraph is reasonably close to a house can be added.
+- Current subgraph checking might still lead to some false positives.
 
 # Demos
 
