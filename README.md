@@ -29,7 +29,7 @@ My algorithm is looking for 6 key points marked in the following image.
 
 Here I've used corner detection cv2.cornerHarris to detect corners in the gray-scale image.
 From the structure of the house there should be about 3-5 corners next to each other for each key point.
-We can therefore discard both too small and too large groups of nearby corners.
+I could therefore discard both too small and too large groups of nearby corners.
 I've tried two ways of accomplishing this:
 
 One way would be to group corners by distance between each other.
@@ -81,12 +81,18 @@ Following logic is done for each node n in the graph:
 I didn't have calibration data for the used camera, so I've used variable focal distance set by a slider.
 Calibration data could be used as well to increase accuracy.
 
-Because we know relative distances between key points of the house we can use cv2.solvePnP to create a projection from 3d world space to our 2d plane.
-Then we use this projection to get 2d coordinates for the middle point of the pyramid in specified height.
+Because the relative distances between key points of the house were known I could use cv2.solvePnP to create a projection from 3d world space to 2d plane of the picture.
+Then I've used this projection to get 2d coordinates for the middle point of the pyramid in specified height.
 
 !["Final point of a pyramid placed"](3d.png?raw=true "Final point of a pyramid placed")
 
 Opencv2 example: https://github.com/opencv/opencv/blob/master/samples/python/plane_ar.py .
+
+# Possible improvements
+
+This work can be improved in following ways:
+- In this case there is always a white area around the house (the paper it was printed on), so this could help to elimiate misleading corners.
+- The relative distances of key points are also so a test whether the subgraph is reasonably close to a house can be added.
 
 # Demos
 
